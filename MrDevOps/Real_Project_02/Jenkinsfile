@@ -1,0 +1,308 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = 'webapp01'
+        DOCKER_REGISTRY = 'g4thungu/web01-docker'
+        DOCKER_CREDENTIALS_ID = 'dockerhub_id'
+        IMAGE_TAG = "v1.${BUILD_ID}"
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git changelog: false, poll: false, url: 'https://github.com/Gathungu/Jenkins-Docker-Project.git'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
+                    sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} g4thungu/$JOB_NAME:${IMAGE_TAG}"
+                    sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} g4thungu/$JOB_NAME:latest"
+                }
+            }
+        }
+        stage('Push Image to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                    script {
+                        sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin"
+                        sh "docker push g4thungu/$JOB_NAME:${IMAGE_TAG}"
+                        sh "docker push g4thungu/$JOB_NAME:latest"
+                        
+                    }
+                }
+            }
+            }
+            stage('Docker Image Clean') {
+                steps {
+                    script {
+                        sh "docker image rm ${DOCKER_IMAGE}:${IMAGE_TAG} g4thungu/$JOB_NAME:${IMAGE_TAG} g4thungu/$JOB_NAME:latest || true"
+                    }
+                }
+            }
+                stage('Docker Container Deployment') {
+                    steps {
+                        sshagent(['web_app01_token']) {
+                            script {
+                                sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.38.27 docker rm -f scriptedcontainer"
+                                sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.38.27 docker rmi -f g4thungu/web01-docker"
+                                sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.38.27 docker run -itd --name scriptedcontainer -p 9000:80 g4thungu/web01-docker:latest"
+                            }
+                        }
+                    }
+                }
+    }
+}
+
+
+
+
+
+
+
+
+// pipeline {
+//     agent any
+
+//     environment {
+//         DOCKER_IMAGE = 'webapp01'
+//         DOCKER_REGISTRY = 'g4thungu/web01-docker'
+//         DOCKER_CREDENTIALS_ID = 'dockerhub_id'
+//         IMAGE_TAG = "v1.${BUILD_ID}"
+//     }
+
+//     stages {
+//         stage('Git Checkout') {
+//             steps {
+//                 git changelog: false, poll: false, url: 'https://github.com/Gathungu/Jenkins-Docker-Project.git'
+//             }
+//         }
+//         stage('Build Docker Image') {
+//             steps {
+//                 script {
+//                     // sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
+//                     // sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${IMAGE_TAG}"
+//                     // sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest"
+//                     sh "docker build -t ${DOCKER_IMAGE}:v1.${BUILD_ID} ."
+//                     sh "docker image tag ${DOCKER_IMAGE}:v1.${BUILD_ID} g4thungu/$JOB_NAME:v1.${BUILD_ID}"
+//                     sh "docker image tag ${DOCKER_IMAGE}:v1.${BUILD_ID} g4thungu/$JOB_NAME:latest"
+//                 }
+//             }
+//         }
+//         stage('Push Image to DockerHub') {
+//             steps {
+//                 withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+//                     script {
+//                         sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin"
+//                      //   sh "docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${IMAGE_TAG}"
+//                      //   sh "docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest"
+//                         sh "docker push g4thungu/$JOB_NAME:v1.${BUILD_ID}"
+//                         sh "docker push g4thungu/$JOB_NAME:latest"
+//                     }
+//                 }
+//             }
+//                 stage('Docker Image clean') {
+//                 steps {
+//                     script {
+//                         sh "docker image rm ${DOCKER_IMAGE}:v1.${BUILD_ID} g4thungu/$JOB_NAME:v1.${BUILD_ID} g4thungu/$JOB_NAME:latest || true"
+//                     }
+//                 }
+//             }
+//             stage('Docker Container Deployment') {
+//                 steps {
+//                     sshagent(['web_app01_token']) {
+//                         script {
+//                             sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.38.27 docker run -itd --name scriptedcontainer -p 9000:80 g4thungu/web01-docker'
+//                             // sh '''
+//                             // ssh -o StrictHostKeyChecking=no ubuntu@172.31.38.27 '
+//                             // docker stop webapp01 || true &&
+//                             // docker rm webapp01 || true &&
+//                             // docker run -itd -p 9000:80 --name scriptedcontainer ${DOCKER_REGISTRY}'
+//                             // '''
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
+
+
+
+// pipeline {
+//     agent any
+
+//     environment {
+//         DOCKER_IMAGE = 'webapp01'
+//         DOCKER_REGISTRY = 'g4thungu/web01-docker' // Define the registry
+//         DOCKER_CREDENTIALS_ID = 'dockerhub_id' // Define docker credentials ID
+//     }
+
+//     stages {
+//         stage('Git Checkout') {
+//             steps {
+//                 git changelog: false, poll: false, url: 'https://github.com/Gathungu/Jenkins-Docker-Project.git'
+//             }
+//         }
+//         stage('Build Docker Image') {
+//             steps {
+//                 // Build Docker Image
+//                 sh "docker build -t ${DOCKER_IMAGE}:v1.${BUILD_ID} ."
+//                 sh "docker image tag ${DOCKER_IMAGE}:v1.${BUILD_ID} g4thungu/$JOB_NAME:${DOCKER_IMAGE}.v1.${BUILD_ID}"
+//                 sh "docker image tag ${DOCKER_IMAGE}:v1.${BUILD_ID} g4thungu/$JOB_NAME:${DOCKER_IMAGE}.latest"
+//             }
+//         }
+//         stage('Push Image to DockerHub') {
+//             steps {
+//                 withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+//                     sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin"
+//                     sh "docker push g4thungu/$JOB_NAME:${DOCKER_IMAGE}.v1.${BUILD_ID}"
+//                     sh "docker push g4thungu/$JOB_NAME:${DOCKER_IMAGE}.latest"
+//                 }
+//             }
+//         }
+//         stage('Docker Image clean'){
+//             steps{
+//                 sh 'docker image rm ${DOCKER_IMAGE}:v1.${BUILD_ID} g4thungu/$JOB_NAME:${DOCKER_IMAGE}.v1.${BUILD_ID} g4thungu/$JOB_NAME:${DOCKER_IMAGE}.latest' 
+//             }
+//         }
+//         stage('Docker Container Deployment'){
+//             steps{
+//                 sshagent(['web_app01_token']){
+//                     sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.38.27 docker run -itd -p 9000:80 -d --name webapp01 g4thungu/web01-docker:webapp01'
+//                 }  
+//             }
+//         }
+
+//     }
+// }
+
+
+
+
+
+// pipeline {
+    
+// 	agent any
+// /*	
+// 	tools {
+//         maven "maven3"
+//     }
+// */	
+//     environment {
+//         NEXUS_VERSION = "nexus3"
+//         NEXUS_PROTOCOL = "http"
+//         NEXUS_URL = "172.31.40.209:8081"
+//         NEXUS_REPOSITORY = "vprofile-release"
+// 	NEXUS_REPO_ID    = "vprofile-release"
+//         NEXUS_CREDENTIAL_ID = "nexuslogin"
+//         ARTVERSION = "${env.BUILD_ID}"
+//     }
+	
+//     stages{
+        
+//         stage('BUILD'){
+//             steps {
+//                 sh 'mvn clean install -DskipTests'
+//             }
+//             post {
+//                 success {
+//                     echo 'Now Archiving...'
+//                     archiveArtifacts artifacts: '**/target/*.war'
+//                 }
+//             }
+//         }
+
+// 	stage('UNIT TEST'){
+//             steps {
+//                 sh 'mvn test'
+//             }
+//         }
+
+// 	stage('INTEGRATION TEST'){
+//             steps {
+//                 sh 'mvn verify -DskipUnitTests'
+//             }
+//         }
+		
+//         stage ('CODE ANALYSIS WITH CHECKSTYLE'){
+//             steps {
+//                 sh 'mvn checkstyle:checkstyle'
+//             }
+//             post {
+//                 success {
+//                     echo 'Generated Analysis Result'
+//                 }
+//             }
+//         }
+
+//         stage('CODE ANALYSIS with SONARQUBE') {
+          
+// 		  environment {
+//              scannerHome = tool 'sonarscanner4'
+//           }
+
+//           steps {
+//             withSonarQubeEnv('sonar-pro') {
+//                sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
+//                    -Dsonar.projectName=vprofile-repo \
+//                    -Dsonar.projectVersion=1.0 \
+//                    -Dsonar.sources=src/ \
+//                    -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
+//                    -Dsonar.junit.reportsPath=target/surefire-reports/ \
+//                    -Dsonar.jacoco.reportsPath=target/jacoco.exec \
+//                    -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
+//             }
+
+//             timeout(time: 10, unit: 'MINUTES') {
+//                waitForQualityGate abortPipeline: true
+//             }
+//           }
+//         }
+
+//         stage("Publish to Nexus Repository Manager") {
+//             steps {
+//                 script {
+//                     pom = readMavenPom file: "pom.xml";
+//                     filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
+//                     echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
+//                     artifactPath = filesByGlob[0].path;
+//                     artifactExists = fileExists artifactPath;
+//                     if(artifactExists) {
+//                         echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version ${pom.version} ARTVERSION";
+//                         nexusArtifactUploader(
+//                             nexusVersion: NEXUS_VERSION,
+//                             protocol: NEXUS_PROTOCOL,
+//                             nexusUrl: NEXUS_URL,
+//                             groupId: pom.groupId,
+//                             version: ARTVERSION,
+//                             repository: NEXUS_REPOSITORY,
+//                             credentialsId: NEXUS_CREDENTIAL_ID,
+//                             artifacts: [
+//                                 [artifactId: pom.artifactId,
+//                                 classifier: '',
+//                                 file: artifactPath,
+//                                 type: pom.packaging],
+//                                 [artifactId: pom.artifactId,
+//                                 classifier: '',
+//                                 file: "pom.xml",
+//                                 type: "pom"]
+//                             ]
+//                         );
+//                     } 
+// 		    else {
+//                         error "*** File: ${artifactPath}, could not be found";
+//                     }
+//                 }
+//             }
+//         }
+
+
+//     }
+
+
+// }
